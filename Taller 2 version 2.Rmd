@@ -1,0 +1,333 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+#library(ISLR2)
+#library(caret)
+#library(ggplot2)
+#library(splines)
+#library(mgcv)
+#library(gam)
+#library(gamclass)
+#library(glm2)
+#library(boot)
+#library(stats)
+#library(VGAM)
+
+
+
+library(ggplot2) # graphics library
+library(MASS)    # contains data sets
+library(ISLR2)    # contains code and data from the textbook
+library(knitr)   # contains kable() function
+library(boot)    # contains cross-validation functions
+library(gam)     # needed for additive models
+```
+
+```{r}
+# Cargar los datos
+datos<-Auto
+datos
+```
+
+```{r}
+sample_size <- nrow(Auto)
+set.seed(456)
+train <- sample(sample_size, 0.9*sample_size)
+test <- seq(sample_size)[!seq(sample_size) %in% train]
+```
+
+```{r}
+train 
+test 
+```
+
+```{r}
+linear_fit <- lm(datos$mpg ~ datos$horsepower)
+#create scatterplot
+plot(datos$mpg, datos$horsepower, cex=1.5, pch=19)
+
+summary(linear_fit)
+
+#add regression line to scatterplot
+abline(linear_fit)
+```
+
+```{r}
+
+#fit spline regression model
+spline_fit <- lm(datos$mpg ~ bs(datos$horsepower, knots=c(1,2,3,4,5,6,7,8,9,10)))
+
+#view summary of spline regression model
+summary(spline_fit)
+
+
+
+```
+
+```{r}
+plot(Auto$horsepower[train],Auto$mpg[train],xlab="HP",ylab="mpg",pch=2)
+mod_sspline = smooth.spline(Auto$horsepower[train], Auto$mpg[train], cv = 10, nknots = 10)
+mod_sspline1 = smooth.spline(Auto$horsepower[train], Auto$mpg[train], cv = FALSE, nknots = 8)
+
+lines(mod_sspline, col = " blue ", lwd = 2,lty=2)
+lines(mod_sspline1, col = " red ", lwd = 2,lty=1)
+
+mse2_knot1 = mean((Auto$mpg[test] - predict(mod_sspline,Auto[test,]$horsepower)$y)**2)
+mse2_knot2 = mean((Auto$mpg[test] - predict(mod_sspline1,Auto[test,]$horsepower)$y)**2)
+
+
+print(mse2_knot1)
+print(mse2_knot2)
+
+```
+
+
+
+```{r}
+library(splines)
+library(boot)
+
+# cargar los datos
+data(Auto)
+
+# especificar el número de pliegues
+k <- 10
+
+# crear índices para el k-fold
+folds <- cut(seq(1, nrow(Auto)), breaks = k, labels = FALSE)
+
+# inicializar el vector para almacenar los errores
+cv.errors <- rep(0, k)
+
+knots1 <- seq(from = min(datos$horsepower), to = max(datos$horsepower), length.out = 10)
+knots1
+
+# ajustar el modelo y calcular los errores de validación cruzada
+for(i in 1:k) {
+  # obtener los índices de entrenamiento y prueba
+  test.index <- which(folds == i, arr.ind = TRUE)
+  train <- Auto[-test.index, ]
+  test <- Auto[test.index, ]
+  
+  # ajustar el modelo con splines B con 6 grados de libertad y 4 nudos
+  fit <- lm(mpg ~ bs(horsepower, df = 6, knots = c()), data = train)
+  
+  # predecir los valores de prueba
+  pred <- predict(fit, newdata = test)
+  
+  # calcular el error de prueba
+  cv.errors[i] <- mean((test$mpg - pred)^2)
+}
+
+# calcular el error de validación cruzada medio
+mean.cv.error <- mean(cv.errors)
+
+# imprimir el error de validación cruzada medio
+cat("El error de validación cruzada medio es:", mean.cv.error, "\n")
+```
+
+
+
+
+
+```{r}
+# Cargar los datos
+datos<-Auto
+
+# Definir los folds para la validación cruzada en 10 folds
+set.seed(123)
+folds <- sample(rep(1:10, length.out = nrow(datos)))
+folds
+
+# Definir el rango de valores para el número de knots
+knots <- seq(from = min(datos$horsepower), to = max(datos$horsepower), length.out = 10)
+knots
+
+# Inicializar un vector para almacenar los errores cuadráticos medios
+mse <- rep(0, length(knots))
+mse
+# Realizar la validación cruzada y calcular los errores cuadráticos medios
+
+for (i in 1:length(knots)) {
+  model1 <- glm(datos$mpg ~ poly(datos$horsepower, k = i), data = datos)
+  cv <- cv.glm(model1, K = 10)
+  mse[i] <- mean(cv$delta^2)
+}
+
+# Encontrar el número óptimo de knots que minimiza el error cuadrático medio
+opt_knots <- knots[which.min(mse)]
+mse_opt <- min(mse)
+```
+```{r}
+set.seed(17)
+cv.error.10 <- rep(0,10)
+for (i in 1:10){
+  glm.fit=glm(mpg ~ poly(horsepower, i), data=Auto)
+  cv.error.10[i] <- cv.glm(Auto, glm.fit, K=10)$delta[1]
+}
+cv.error.10
+```
+
+
+```{r}
+set.seed(17)
+cv.error.10 <- rep(0,10)
+for (i in 1:10){
+  glm.fit=glm(mpg ~ poly(horsepower, i), data=Auto)
+  cv.error.10[i] <- cv.glm(Auto, glm.fit, K=10)$delta[1]
+}
+cv.error.10
+```
+
+
+
+```{r}
+set.seed(17)
+cv.error.10<-rep(0, 10) 
+for(i in 1:10) {
+  glm.fit<-glm(datos$mpg~poly(datos$horsepower, i), data=Auto)
+  cv.error[i]<-cv.glm(Auto,glm.fit)$delta[1]
+  }
+cv.error.10
+  
+```
+
+```{r}
+
+set.seed(123)
+
+cv.error.10=rep(0 ,10)
+for (i in 1:10){
+  glm.fit<-glm(datos$mpg ~ poly(datos$horsepower ,i),data=Auto)
+  cv.error.10[i]<-cv.glm(datos,glm.fit ,K=10)$delta [1]
+}
+cv.error.10
+```
+
+```{r}
+datos<-Auto
+
+# Definir los folds para la validación cruzada en 10 folds
+set.seed(123)
+folds <- sample(rep(1:10, length.out = nrow(datos)))
+
+# Definir el modelo spline
+#model <- lm(mpg ~ horsepower, data = datos)
+model <- gam(mpg ~ horsepower(df = 4), data = datos)
+# mod1 = lm(mpg ~ horsepower,data=Auto[train_index,])
+
+# Realizar la validación cruzada
+cv <- crossval(model, folds = folds)
+
+# Ver los resultados de la validación cruzada
+summary(cv)
+```
+
+
+
+
+
+
+
+```{r}
+sample_size <- nrow(Auto)
+set.seed(456)
+train1 <- sample(sample_size, 0.9*sample_size)
+test1 <- seq(sample_size)[!seq(sample_size) %in% train]
+```
+
+
+```{r}
+folds <-createFolds(Auto$horsepower, k = 10)
+
+
+```
+
+```{r}
+
+
+# Fijar la semilla para reproducibilidad
+set.seed(42)
+
+# Separación aleatoria de los datos en entrenamiento y prueba
+n <- nrow(datos)
+train_index <- sample(n, floor(n*0.9))
+train_data <- datos[train_index,]
+test_data <- datos[-train_index,]
+
+```
+
+```{r}
+sample_size <- nrow(Auto)
+set.seed(456)
+train1 <- sample(sample_size, 0.9*sample_size)
+test1 <- seq(sample_size)[!seq(sample_size) %in% train]
+```
+
+```{r}
+set.seed(123)
+train <- sample(nrow(datos), nrow(datos)*0.9)
+x_train <- x[train, ]
+y_train <- Y1[train]
+x_test <- x[-train, ]
+y_test <- Y1[-train]
+```
+
+
+
+```{r}
+mod1 = lm(mpg ~ horsepower,data=Auto[train_index,])
+```
+
+```{r}
+xvals = data.frame(horsepower = seq(min(Auto$horsepower),
+max(Auto$horsepower,by=1)))
+plot(Auto$horsepower[train_index],Auto$mpg[train_index],xlab="HP",ylab="mpg",pch=2)
+```
+```{r}
+mod1 = lm(mpg ~ horsepower,data=Auto[train_index,])
+mse1 = mean((Auto$mpg[test_data] - predict(mod1,Auto)[test_data])**2)
+mod2 = lm(mpg ~ poly(horsepower,2),data=Auto[train_index,])
+mse2 = mean((Auto$mpg[test_data] - predict(mod2, Auto)[test_data])**2)
+print(mse1)
+```
+
+```{r}
+plot(Auto$horsepower[train_index],Auto$mpg[train1],xlab="HP",ylab="mpg",pch=2)
+mod_sspline = smooth.spline(Auto$horsepower[train1], Auto$mpg[train1], cv = TRUE)
+mod_sspline1 = smooth.spline(Auto$horsepower[train1], Auto$mpg[train1], cv = TRUE, nknots = 5)
+
+
+
+lines(mod_sspline, col = " blue ", lwd = 2,lty=2)
+lines(mod_sspline1, col = " red ", lwd = 2,lty=1)
+
+mse2_knot1 = mean((Auto$mpg[test1] - predict(mod_sspline,Auto[test1,]$horsepower)$y)**2)
+mse2_knot2 = mean((Auto$mpg[test1] - predict(mod_sspline1,Auto[test1,]$horsepower)$y)**2)
+
+
+print(mse2_knot1)
+print(mse2_knot2)
+
+```
+
+
+```{r}
+ 
+```
+
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
