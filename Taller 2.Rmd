@@ -1,0 +1,100 @@
+---
+title: "Taller 2 AAD"
+author: "Hector Rojas"
+date: "2023-04-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+install.packages("mgcv")
+install.packages("caret")  # Install the caret package
+library(caret)            # Load the caret package
+library(ISLR2)
+library(boot)
+library(splines)
+library(mgcv)
+library(gam)
+
+```
+
+```{r}
+datos<-Auto
+datos
+```
+
+```{r}
+class(datos)
+```
+```{r}
+# Create new data frame with only columns x and y
+new_df <- data.frame(hp = datos$horsepower, mpg = datos$mpg)
+new_df
+```
+```{r}
+# Set seed for reproducibility
+set.seed(123)
+
+# Randomly split the data into training and testing datasets
+train_indices <- sample(nrow(new_df), round(0.9 * nrow(new_df)))
+train_df <- df[train_indices, ]
+test_df <- df[-train_indices, ]
+
+# Print the dimensions of the resulting datasets
+cat("Training dataset dimensions:", dim(train_df), "\n")
+cat("Testing dataset dimensions:", dim(test_df), "\n")
+```
+```{r}
+plot(new_df)
+```
+
+
+```{r}
+
+# Define the number of folds for cross-validation
+k <- 10
+
+# Define the range of degrees of freedom for the natural spline
+df_range <- seq(2, 10, by = 1)
+
+# Split the data into k folds
+folds <- createFolds(new_df$mpg, k = k)
+
+# Initialize a vector to store the mean squared errors
+mse <- rep(0, length(df_range))
+
+# Loop over each value of degrees of freedom and perform cross-validation
+for (i in 1:length(df_range)) {
+  mse_fold <- rep(0, k)
+  for (j in 1:k) {
+    # Get the training and testing data for this fold
+    train <- unlist(folds[-j])
+    test <- folds[[j]]
+    # Fit the model using the training data and evaluate on the testing data
+    model <- glm(mpg ~ ns(hp, df = df_range[i]), data = new_df[train,])
+    pred <- predict(model, newdata = new_df[test,])
+    mse_fold[j] <- mean((new_df$mpg[test] - pred)^2)
+  }
+  # Average the mean squared errors across folds
+  mse[i] <- mean(mse_fold)
+}
+
+# Find the number of degrees of freedom that minimizes the mean squared error
+opt_df <- df_range[which.min(mse)]
+mse_opt <- min(mse)
+
+# Print the optimal number of degrees of freedom and the minimum mean squared error
+cat("The optimal number of degrees of freedom is", opt_df, "with a minimum mean squared error of", mse_opt)
+print(mse)
+```
+
+
