@@ -24,6 +24,8 @@ library(boot)
 library(splines)
 library(mgcv)
 library(gam)
+library(glmnet)
+library(ISLR)
 
 ```
 
@@ -37,24 +39,26 @@ class(datos)
 ```
 ```{r}
 # Create new data frame with only columns x and y
-new_df <- data.frame(hp = datos$horsepower, mpg = datos$mpg)
-new_df
+nueva_data2 <- data.frame(hp = datos$horsepower, mpg = datos$mpg)
+nueva_data2
 ```
 ```{r}
 # Set seed for reproducibility
 set.seed(123)
 
 # Randomly split the data into training and testing datasets
-train_indices <- sample(nrow(new_df), round(0.9 * nrow(new_df)))
-train_df <- df[train_indices, ]
-test_df <- df[-train_indices, ]
+train_indices_autos <- sample(nrow(nueva_data2), round(0.9 * nrow(nueva_data2)))
+train_autos <- nueva_data2[train_indices_autos, ]
+test_autos <- nueva_data2[-train_indices_autos, ]
 
 # Print the dimensions of the resulting datasets
-cat("Training dataset dimensions:", dim(train_df), "\n")
-cat("Testing dataset dimensions:", dim(test_df), "\n")
+cat("Training dataset dimensions:", dim(train_autos), "\n")
+cat("Testing dataset dimensions:", dim(test_autos), "\n")
 ```
+
+
 ```{r}
-plot(new_df)
+plot(nueva_data2)
 ```
 
 
@@ -64,37 +68,168 @@ plot(new_df)
 k <- 10
 
 # Define the range of degrees of freedom for the natural spline
-df_range <- seq(2, 10, by = 1)
+df_range_autos <- seq(2, 10, by = 1)
 
 # Split the data into k folds
-folds <- createFolds(new_df$mpg, k = k)
+folds <- createFolds(nueva_data2$mpg, k = k)
 
 # Initialize a vector to store the mean squared errors
-mse <- rep(0, length(df_range))
+mse <- rep(0, length(df_range_autos))
 
 # Loop over each value of degrees of freedom and perform cross-validation
-for (i in 1:length(df_range)) {
+for (i in 1:length(df_range_autos)) {
   mse_fold <- rep(0, k)
   for (j in 1:k) {
     # Get the training and testing data for this fold
     train <- unlist(folds[-j])
     test <- folds[[j]]
     # Fit the model using the training data and evaluate on the testing data
-    model <- glm(mpg ~ ns(hp, df = df_range[i]), data = new_df[train,])
-    pred <- predict(model, newdata = new_df[test,])
-    mse_fold[j] <- mean((new_df$mpg[test] - pred)^2)
+    model <- lm(mpg ~ s(hp, df = df_range_autos[i]), data = train_autos)
+    pred <- predict(model, newdata = test_autos)
+    mse_fold[j] <- mean((test_autos$mpg  - pred)^2)
   }
   # Average the mean squared errors across folds
   mse[i] <- mean(mse_fold)
 }
 
 # Find the number of degrees of freedom that minimizes the mean squared error
-opt_df <- df_range[which.min(mse)]
+opt_df <- df_range_autos[which.min(mse)]
 mse_opt <- min(mse)
 
 # Print the optimal number of degrees of freedom and the minimum mean squared error
 cat("The optimal number of degrees of freedom is", opt_df, "with a minimum mean squared error of", mse_opt)
 print(mse)
+
+```
+
+
+```{r}
+# Fit global degree 2 polynomial model and evaluate its predictive power
+poly_model <- lm(mpg ~ poly(hp, 2), data = train_autos)
+poly_pred <- predict(poly_model, newdata = test_autos)
+poly_mse <- mean((test_autos$mpg - poly_pred)^2)
+cat("MSE for global degree 2 polynomial model:", poly_mse, "\n")
+
+
+```
+```{r}
+# Fit spline smoothing model and evaluate its predictive power
+spline_model <- lm(mpg ~ ns(hp, df = opt_df), data = train_autos)
+spline_pred <- predict(spline_model, newdata = test_autos)
+spline_mse <- mean((test_autos$mpg - spline_pred)^2)
+cat("MSE for spline smoothing model:", spline_mse, "\n")
+```
+
+
+```{r}
+# Fit optimal spline regression model and evaluate its predictive power
+opt_spline_model <- lm(mpg ~ bs(hp, df = opt_df), data = train_autos)
+opt_spline_pred <- predict(opt_spline_model, newdata = test_autos)
+opt_spline_mse <- mean((test_autos$mpg - opt_spline_pred)^2)
+cat("MSE for optimal spline regression model:", opt_spline_mse, "\n")
+```
+
+```{r}
+mod_sspline1 = smooth.spline(train_autos$hp, train_autos$mpg, cv = FALSE, nknots = 10)
+mse2_knot2 = mean((test_autos$mpg - predict(mod_sspline1,test_autos$hp)$y)**2)
+cat("MSE for spline smoothing model:", mse2_knot2)
+
+```
+```{r}
+# Fit local polynomial regression models of degree 0, 1, and 2
+degree0_model <- loess(mpg ~ hp, data = train_autos, degree = 0)
+degree1_model <- loess(mpg ~ hp, data = train_autos, degree = 1)
+degree2_model <- loess(mpg ~ hp, data = train_autos, degree = 2)
+
+# Predict using each model and calculate mean squared error on the test set
+degree0_pred <- predict(degree0_model, newdata = test_autos)
+degree1_pred <- predict(degree1_model, newdata = test_autos)
+degree2_pred <- predict(degree2_model, newdata = test_autos)
+
+degree0_mse <- mean((test_autos$mpg - degree0_pred)^2)
+degree1_mse <- mean((test_autos$mpg - degree1_pred)^2)
+degree2_mse <- mean((test_autos$mpg - degree2_pred)^2)
+
+# Determine the model with the smallest mean squared error
+mse <- c(degree0_mse, degree1_mse, degree2_mse)
+opt_degree <- which.min(mse)
+
+# Print the optimal model and its mean squared error
+cat("The optimal local polynomial regression model has degree", opt_degree, "with a mean squared error of", mse[opt_degree], "\n")
+```
+
+```{r}
+
+cat("MSE for global degree 2 polynomial model:", poly_mse, "\n")
+
+
+cat("MSE for local regression model:", loess_mse, "\n")
+
+
+cat("MSE for optimal spline regression model:", opt_spline_mse, "\n")
+```
+```{r}
+# Set seed for reproducibility
+set.seed(123)
+
+# Create a function to fit and evaluate a model using cross-validation
+fit_eval_model <- function(model, nueva_data2, k = 10) {
+  # Split the data into k folds
+  folds <- createFolds(nueva_data2$mpg, k = k)
+  
+  # Initialize a vector to store the mean squared errors
+  mse <- rep(0, k)
+  
+  # Loop over each fold and perform cross-validation
+  for (i in 1:k) {
+    # Get the training and testing data for this fold
+    train <- unlist(folds[-i])
+    test <- folds[[i]]
+    
+    # Fit the model using the training data and evaluate on the testing data
+    model_fit <- model(train)
+    pred <- predict(model_fit, newdata = test_autos)
+    mse[i] <- mean((test_autos$mpg - pred)^2)
+  }
+  
+  # Return the mean squared error
+  return(mean(mse))
+}
+
+# Define the models to evaluate
+models <- list(
+  "Function based" = function(data) lm(mpg ~ hp, data = nueva_data2),
+  "Local regression" = function(data) loess(mpg ~ hp, data = nueva_data2),
+  "Global polynomial degree 2" = function(data) lm(mpg ~ poly(hp, 2), data = nueva_data2)
+)
+
+# Initialize a vector to store the test MSEs for each model
+test_mse <- matrix(NA, nrow = 10, ncol = length(models))
+
+# Loop over 10 runs of cross-validation and evaluate each model
+for (i in 1:10) {
+  # Randomly split the data into training and testing datasets
+  train_indices <- sample(nrow(nueva_data2), round(0.9 * nrow(nueva_data2)))
+  train_data <- nueva_data2[train_indices, ]
+  test_data <- nueva_data2[-train_indices, ]
+  
+  # Evaluate each model on the test data and store the results
+  for (j in 1:length(models)) {
+    test_mse[i, j] <- fit_eval_model(models[[j]], train_data, k = 10)
+  }
+}
+
+# Create a boxplot of the test MSEs for each model
+boxplot(test_mse, main = "Test MSEs for different models", ylab = "MSE", names = names(models))
+
+# Calculate the median test MSE for each model
+median_mse <- apply(test_mse, 2, median)
+
+# Print the median test MSE for each model
+cat("Median test MSEs:\n")
+cat(paste0(names(models), ": ", median_mse, "\n"))
+
+
 ```
 
 
