@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
 ```
 
 ## R Markdown
@@ -35,113 +35,117 @@ datos
 ```
 
 ```{r}
-class(datos)
-```
-```{r}
-# Create new data frame with only columns x and y
+# Crear un nuevo data frame con solo las columnas x e y
 nueva_data2 <- data.frame(hp = datos$horsepower, mpg = datos$mpg)
 nueva_data2
 ```
+
+1.  **Separe aleatoriamente (pero guarde la semilla) su conjunto de datos en dos partes:**
+
+    **Entrenamiento: 90% de los autos.**
+
+    **Prueba: 10% de los autos.**
+
 ```{r}
-# Set seed for reproducibility
+# Establecer una semilla para reproducibilidad
 set.seed(123)
 
-# Randomly split the data into training and testing datasets
+# Dividir aleatoriamente los datos en conjuntos de entrenamiento y prueba
 train_indices_autos <- sample(nrow(nueva_data2), round(0.9 * nrow(nueva_data2)))
 train_autos <- nueva_data2[train_indices_autos, ]
 test_autos <- nueva_data2[-train_indices_autos, ]
 
-# Print the dimensions of the resulting datasets
+# Imprimir las dimensiones de los conjuntos de datos resultantes
 cat("Training dataset dimensions:", dim(train_autos), "\n")
 cat("Testing dataset dimensions:", dim(test_autos), "\n")
 ```
-
 
 ```{r}
 plot(nueva_data2)
 ```
 
+2.  **Usando los datos de entrenamiento Mediante validación cruzada en 10 folds, determine el número óptimo de knots para el problema de regresión spline. Considere como número de posible de knots 1,...,10, igualmente espaciados en el rango de la variable horsepower. ¿Qué modelo (es decir, cual valor de knot con k = 1, ..., 10) resulta en un menor ECM de predición?**
 
 ```{r}
-
-# Define the number of folds for cross-validation
+# Definir el número de folds para la validación cruzada
 k <- 10
 
-# Define the range of degrees of freedom for the natural spline
+# Definir el rango de grados de libertad para el spline natural
 df_range_autos <- seq(2, 10, by = 1)
 
-# Split the data into k folds
-folds <- createFolds(nueva_data2$mpg, k = k)
+# Dividir los datos en k folds
+folds <- createFolds(nueva_data2$hp, k = k)
 
-# Initialize a vector to store the mean squared errors
+# Inicializar un vector para almacenar los errores cuadráticos medios
 mse <- rep(0, length(df_range_autos))
 
-# Loop over each value of degrees of freedom and perform cross-validation
+# Ciclo sobre cada valor de grados de libertad y realizar validación cruzada
 for (i in 1:length(df_range_autos)) {
   mse_fold <- rep(0, k)
   for (j in 1:k) {
-    # Get the training and testing data for this fold
-    train <- unlist(folds[-j])
-    test <- folds[[j]]
-    # Fit the model using the training data and evaluate on the testing data
-    model <- lm(mpg ~ s(hp, df = df_range_autos[i]), data = train_autos)
-    pred <- predict(model, newdata = test_autos)
-    mse_fold[j] <- mean((test_autos$mpg  - pred)^2)
+    # Obtener los datos de entrenamiento y prueba para este fold
+    train <- nueva_data2[-folds[[i]], ]
+    test <- nueva_data2[folds[[i]], ]
+    # Ajustar el modelo utilizando los datos de entrenamiento y evaluar en los datos de prueba
+    model <- lm(mpg ~ s(hp, df = df_range_autos[i]), data = train)
+    pred <- predict(model, newdata = test)
+    mse_fold[j] <- mean((test$mpg  - pred)^2)
   }
-  # Average the mean squared errors across folds
+  # Promediar los errores cuadráticos medios a través de los folds
   mse[i] <- mean(mse_fold)
 }
 
-# Find the number of degrees of freedom that minimizes the mean squared error
+# Encontrar el número de grados de libertad que minimiza el error cuadrático medio
 opt_df <- df_range_autos[which.min(mse)]
 mse_opt <- min(mse)
 
-# Print the optimal number of degrees of freedom and the minimum mean squared error
-cat("The optimal number of degrees of freedom is", opt_df, "with a minimum mean squared error of", mse_opt)
+# Imprimir el número óptimo de grados de libertad y el mínimo error cuadrático medio
+cat("El número óptimo de grados de libertad es", opt_df, "con un error cuadrático medio mínimo de", mse_opt)
 print(mse)
 
 ```
 
+El modelo que resultó en un menor ECM de predicción fue aquel que utilizó un número de knots igual a 3, donde 3 es el valor de knots que minimizó el MSE durante la validación cruzada. Por lo tanto, se recomienda utilizar un modelo de regresión spline con X knots para predecir los valores de la variable de interés
+
+3.  **Usando los datos de entrenamiento, determine el mejor modelo basado en base de funciones Compare el poder de predicción de los modelos: polinomio grado 2 global, spline suavizado y del modelo de regresión spline óptimo (encontrado en el punto anterior) utilizando validación cruzada en 10 folds. ¿Cuál de los tres modelos seleccionaría basado en el ECM de predición?.**
 
 ```{r}
-# Fit global degree 2 polynomial model and evaluate its predictive power
-poly_model <- lm(mpg ~ poly(hp, 2), data = train_autos)
-poly_pred <- predict(poly_model, newdata = test_autos)
-poly_mse <- mean((test_autos$mpg - poly_pred)^2)
-cat("MSE for global degree 2 polynomial model:", poly_mse, "\n")
+# definiendo el modelo polinomial de grado 2
+poly_model <- lm(mpg ~ poly(hp, 2), data = train)
+poly_pred <- predict(poly_model, newdata = test)
+poly_mse <- mean((test$mpg - poly_pred)^2)
+cat("MSE para el modelo pilinomial de grado 2:", poly_mse, "\n")
 
-
-```
-```{r}
-# Fit spline smoothing model and evaluate its predictive power
-spline_model <- lm(mpg ~ ns(hp, df = opt_df), data = train_autos)
-spline_pred <- predict(spline_model, newdata = test_autos)
-spline_mse <- mean((test_autos$mpg - spline_pred)^2)
-cat("MSE for spline smoothing model:", spline_mse, "\n")
-```
-
-
-```{r}
-# Fit optimal spline regression model and evaluate its predictive power
-opt_spline_model <- lm(mpg ~ bs(hp, df = opt_df), data = train_autos)
-opt_spline_pred <- predict(opt_spline_model, newdata = test_autos)
-opt_spline_mse <- mean((test_autos$mpg - opt_spline_pred)^2)
-cat("MSE for optimal spline regression model:", opt_spline_mse, "\n")
 ```
 
 ```{r}
-mod_sspline1 = smooth.spline(train_autos$hp, train_autos$mpg, cv = FALSE, nknots = 10)
-mse2_knot2 = mean((test_autos$mpg - predict(mod_sspline1,test_autos$hp)$y)**2)
-cat("MSE for spline smoothing model:", mse2_knot2)
+# Modelo Spline smoothing
+spline_model <- lm(mpg ~ ns(hp, df = opt_df), data = train)
+spline_pred <- predict(spline_model, newdata = test)
+spline_mse <- mean((test$mpg - spline_pred)^2)
+cat("MSE para Modelo Spline smoothing:", spline_mse, "\n")
 
 ```
+
 ```{r}
-# Fit local polynomial regression models of degree 0, 1, and 2
+# Modelo optimal Spline
+opt_spline_model <- lm(mpg ~ bs(hp, df = opt_df), data = train)
+opt_spline_pred <- predict(opt_spline_model, newdata = test)
+opt_spline_mse <- mean((test$mpg - opt_spline_pred)^2)
+cat("MSE para modelo optimal Spline:", opt_spline_mse, "\n")
+```
+
+el mejor modelo dado los modelos mostrados es el Spline smoothing que tiene un error de 32.24 de MSE
+
+4.  **Usando los datos de entrenamiento, determine el mejor modelo basado en regresión local Determine la regresión polinomial local con kernel gaussiano que resulte en menor error de predicción: regresión de grado 0, 1 o 2. Use el ancho de banda óptimo dado por defecto por la función loess().**
+
+```{r}
+# Ajustar modelos de regresión polinomial local de grado 0, 1 y 2
 degree0_model <- loess(mpg ~ hp, data = train_autos, degree = 0)
 degree1_model <- loess(mpg ~ hp, data = train_autos, degree = 1)
 degree2_model <- loess(mpg ~ hp, data = train_autos, degree = 2)
 
-# Predict using each model and calculate mean squared error on the test set
+# Predecir usando cada modelo y calcular el error cuadrático medio en el conjunto de prueba
 degree0_pred <- predict(degree0_model, newdata = test_autos)
 degree1_pred <- predict(degree1_model, newdata = test_autos)
 degree2_pred <- predict(degree2_model, newdata = test_autos)
@@ -150,86 +154,88 @@ degree0_mse <- mean((test_autos$mpg - degree0_pred)^2)
 degree1_mse <- mean((test_autos$mpg - degree1_pred)^2)
 degree2_mse <- mean((test_autos$mpg - degree2_pred)^2)
 
-# Determine the model with the smallest mean squared error
+# Determinar el modelo con el menor error cuadrático medio
 mse <- c(degree0_mse, degree1_mse, degree2_mse)
 opt_degree <- which.min(mse)
 
-# Print the optimal model and its mean squared error
-cat("The optimal local polynomial regression model has degree", opt_degree, "with a mean squared error of", mse[opt_degree], "\n")
+# Imprimir el modelo óptimo y su error cuadrático medio
+cat("El modelo optimo de regresion polinomial local tiene grado", opt_degree, "con un MSE de", mse[opt_degree], "\n")
 ```
+
+5.  **Usando los datos de entrenamiento y de prueba, determine el mejor de los tres paradigmas de modelamiento Ajuste el mejor modelo basado en base de funciones, el mejor modelo basado en regresión local y un polinomio global de grado dos con los datos de entrenamiento y calcule el ECM de prueba para cada modelo.**
 
 ```{r}
 
-cat("MSE for global degree 2 polynomial model:", poly_mse, "\n")
+cat("MSE para modelo polinomial de grado 2:", poly_mse, "\n")
 
 
-cat("MSE for local regression model:", loess_mse, "\n")
+cat("MSE para modelo optimal spline:", opt_spline_mse, "\n")
 
 
-cat("MSE for optimal spline regression model:", opt_spline_mse, "\n")
+cat("MSE para modelo spline smoothing:", spline_mse, "\n")
 ```
-```{r}
-# Set seed for reproducibility
-set.seed(123)
 
-# Create a function to fit and evaluate a model using cross-validation
-fit_eval_model <- function(model, nueva_data2, k = 10) {
-  # Split the data into k folds
+**Repita (1) - (5) un total de 10 veces de manera que en el paso (1) conforme una nueva muestra de validación cruzada, esto le permitirá obtener 10 ECM de prueba para cada paradigma de modelamiento. Grafique las tres distribuciones del ECM de prueba y responda ¿Cuál acercmiento seleccionaría basado en el ECM de predición: basado en base de funciones, basado en regresión local o polinomial global?.**
+
+```{r}
+# Crear una función para ajustar y evaluar un modelo usando validación cruzada
+  fit_eval_model <- function(model, nueva_data2, k = 10) {
+  # Dividir los datos en k folds
   folds <- createFolds(nueva_data2$mpg, k = k)
   
-  # Initialize a vector to store the mean squared errors
+  # Inicializar un vector para almacenar los errores cuadrados medios
   mse <- rep(0, k)
   
-  # Loop over each fold and perform cross-validation
+  # Iterar sobre cada fold y realizar la validación cruzada
   for (i in 1:k) {
-    # Get the training and testing data for this fold
+    #  Obtener los datos de entrenamiento y prueba para este fold
     train <- unlist(folds[-i])
     test <- folds[[i]]
     
-    # Fit the model using the training data and evaluate on the testing data
+    # Ajustar el modelo usando los datos de entrenamiento y evaluarlo en los datos de prueba
     model_fit <- model(train)
     pred <- predict(model_fit, newdata = test_autos)
     mse[i] <- mean((test_autos$mpg - pred)^2)
   }
   
-  # Return the mean squared error
+  # Devolver el error cuadratico medio
   return(mean(mse))
 }
 
-# Define the models to evaluate
+# Definir los modelos a evaluar
 models <- list(
-  "Function based" = function(data) lm(mpg ~ hp, data = nueva_data2),
-  "Local regression" = function(data) loess(mpg ~ hp, data = nueva_data2),
-  "Global polynomial degree 2" = function(data) lm(mpg ~ poly(hp, 2), data = nueva_data2)
+  "Funcion base" = function(data) lm(mpg ~ hp, data = nueva_data2),
+  "Regresion Local" = function(data) loess(mpg ~ hp, data = nueva_data2),
+  "Regresion polinomial grado 2" = function(data) lm(mpg ~ poly(hp, 2), data = nueva_data2)
 )
 
-# Initialize a vector to store the test MSEs for each model
+# Inicializar un vector para almacenar los errores cuadraticos medios en prueba para cada modelo
 test_mse <- matrix(NA, nrow = 10, ncol = length(models))
 
-# Loop over 10 runs of cross-validation and evaluate each model
+# Iterar 10 veces la validación cruzada y evaluar cada modelo
 for (i in 1:10) {
-  # Randomly split the data into training and testing datasets
+  # Dividir aleatoriamente los datos en conjuntos de entrenamiento y prueba
   train_indices <- sample(nrow(nueva_data2), round(0.9 * nrow(nueva_data2)))
   train_data <- nueva_data2[train_indices, ]
   test_data <- nueva_data2[-train_indices, ]
   
-  # Evaluate each model on the test data and store the results
+  # Evaluar cada modelo en los datos de prueba y almacenar los resultados
   for (j in 1:length(models)) {
     test_mse[i, j] <- fit_eval_model(models[[j]], train_data, k = 10)
   }
 }
 
-# Create a boxplot of the test MSEs for each model
+# Crear un boxplot de caja de los errores cuadraticos medios en prueba para cada modelo
 boxplot(test_mse, main = "Test MSEs for different models", ylab = "MSE", names = names(models))
 
-# Calculate the median test MSE for each model
+# Calcular la mediana de los errores cuadraticos medios en prueba para cada modelo
 median_mse <- apply(test_mse, 2, median)
 
-# Print the median test MSE for each model
+# Imprimir la mediana de los errores cuadraticos medios en prueba para cada modelo
 cat("Median test MSEs:\n")
 cat(paste0(names(models), ": ", median_mse, "\n"))
 
 
 ```
 
-
+Basado en los acercamiento seleccionamos el modelo basado en regresion local ya que minimiza el MSE
