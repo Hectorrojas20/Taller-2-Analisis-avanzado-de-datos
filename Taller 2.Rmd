@@ -1,6 +1,6 @@
 ---
 title: "Taller 2 AAD"
-author: "Hector Rojas"
+author: "Hector Rojas y Jorge Esneider Henao"
 date: "2023-04-20"
 output: html_document
 ---
@@ -32,14 +32,15 @@ library(ISLR)
 
 ```{r}
 datos<-Auto
-datos
+head(datos)
 ```
 
 ```{r}
 # Crear un nuevo data frame con solo las columnas x e y
 nueva_data2 <- data.frame(hp = datos$horsepower, mpg = datos$mpg)
-nueva_data2
 ```
+
+***Problema 1***
 
 1.  **Separe aleatoriamente (pero guarde la semilla) su conjunto de datos en dos partes:**
 
@@ -240,3 +241,32 @@ cat(paste0(names(models), ": ", median_mse, "\n"))
 ```
 
 Basado en los acercamiento seleccionamos el modelo basado en regresion local ya que minimiza el MSE
+
+***Problema 2***
+
+![](Pregunta%201.png)
+
+El estimador de Nadarya-Watson para la i-ésima unidad estadística en el punto t se define como sigue:
+
+![](imagen%202.png)
+
+donde Yi es la observación de la función Y en el punto Xi , K es una función núcleo simétrica y suave, h es el ancho de banda o ventana de suavizado y n es el número de observaciones para la i-ésima unidad estadística.
+
+Este estimador se basa en la idea de suavizar la función mediante la combinación lineal ponderada de las observaciones cercanas, utilizando una función núcleo para dar mayor peso a las observaciones más cercanas en el intervalo de suavizado.
+
+![](pregunta%202.png)
+
+Este estimador se basa en la idea de suavizar la función media mediante la combinación lineal ponderada de todas las observaciones cercanas en el intervalo de suavizado, utilizando una función núcleo para dar mayor peso a las observaciones más cercanas. Demir and Toktamiş (2010)
+
+![](imagen%203.png)
+
+**Bibliografia**:
+
+-   Demir, Serdar & Toktamis, Oniz. (2010). On The Adaptive Nadaraya-Watson Kernel Regression Estimators. Hacettepe Journal of Mathematics and Statistics. 39. 429-437.
+
+-   Watson, G. S. (1964). Smooth Regression Analysis. Sankhyā: The Indian Journal of Statistics, Series A (1961-2002), 26(4), 359--372. <http://www.jstor.org/stable/25049340>
+
+-   Cornistein, Romina (2013). Estimadores de Naradaya Watson aplicados a datos funcionales. Universidad de Buenos Aires, recuperado de <https://web.dm.uba.ar/files/tesis_lic/2013/romina_cornistein.pdf>
+
+-   Demir S, Toktamiş Ö (2010). On the Adaptive Nadaraya-Watson Kernel
+    Regression Estimators. Hacettepe J. Math. Stat. 39(3):429-437. recuperado de <https://dergipark.org.tr/tr/download/article-file/86715>
